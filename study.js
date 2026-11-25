@@ -264,7 +264,7 @@
     $("study-check").disabled = waiting || playing;
     $("study-reveal").disabled = waiting || playing;
     const player = $("study-recording");
-    player.hidden = !state.url;
+    player.hidden = !state.url || playing || state.phase === "requesting" || state.phase === "stopping";
     if (state.url && player.getAttribute("src") !== state.url) player.src = state.url;
     if (!state.url && player.hasAttribute("src")) {
       player.pause();
@@ -364,7 +364,10 @@
   });
   $("study-record").addEventListener("click", () => {
     if (audio.state.phase === "recording") audio.stop();
-    else audio.start();
+    else {
+      $("study-recording").pause();
+      audio.start();
+    }
   });
   $("study-transcribe").addEventListener("click", () => {
     audioRequest = { id: round.item.id, initialAnswer: round.answer };
