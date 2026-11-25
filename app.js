@@ -655,7 +655,7 @@
 
   function showPage() {
     const hash = location.hash.slice(1);
-    const page = ["trainer", "materials", "history"].includes(hash) ? hash : "trainer";
+    const page = ["practice", "trainer", "materials", "history"].includes(hash) ? hash : "practice";
     if (page !== "trainer") {
       cancelDictation();
       voice?.suspend();
@@ -667,6 +667,7 @@
     });
     if (page === "materials") renderMaterials();
     if (page === "history") renderHistory();
+    window.EXAM_STUDY_UI?.show(page === "practice");
     if (currentPage && page !== currentPage) window.scrollTo(0, 0);
     currentPage = page;
   }
