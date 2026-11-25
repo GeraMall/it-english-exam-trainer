@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Экзаменационные билеты по техническому английскому, тренировка устных ответов и автоматическая оценка из 30.">
+  <meta name="theme-color" content="#234787">
+  <title>Английский для ИТ · Экзаменационный тренажёр</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="styles.css?v=3">
+  <script defer src="data/vocabulary.js"></script>
+  <script defer src="data/course.js"></script>
+  <script defer src="grading.js"></script>
+  <script defer src="transcription.js"></script>
+  <script defer src="pronunciation.js"></script>
+  <script defer src="phonemes.js"></script>
+  <script defer src="voice.js"></script>
+  <script defer src="app.js?v=3"></script>
+</head>
+<body>
+  <header class="site-bar">
+    <div class="shell bar-inner">
+      <a class="brand" href="#trainer">
+        <span class="brand-icon" aria-hidden="true"><i></i></span>
+        <span>Английский для ИТ</span>
+      </a>
+      <span class="bar-aside">Учебный кабинет</span>
+    </div>
+  </header>
+  <main class="shell">
+    <div class="intro">
+      <div>
+        <nav class="breadcrumbs" aria-label="Расположение"><a href="#materials">Иностранный язык</a><span aria-hidden="true">/</span><span>3–4-й семестры</span></nav>
+        <h1>Экзаменационный тренажёр</h1>
+        <p>Устный экзамен по курсу Essential English for IT Students</p>
+      </div>
+      <button type="button" class="exam-date" id="edit-date" aria-label="Изменить дату экзамена">
+        <span class="calendar-icon" aria-hidden="true"></span>
+        <span class="date-copy"><span id="days-left">До экзамена</span><span id="exam-date-label">10 декабря 2026</span></span>
+        <span class="date-edit" aria-hidden="true">✎</span>
+      </button>
+    </div>
+    <nav class="tabs" aria-label="Разделы">
+      <a href="#trainer" data-page="trainer">Тренажёр</a>
+      <a href="#materials" data-page="materials">Материалы</a>
+      <a href="#history" data-page="history">История попыток</a>
+    </nav>
+
+    <section id="page-trainer" class="page">
+      <div class="main-grid">
+        <div class="ticket-column">
+          <div class="section-bar">
+            <h2>Билет</h2>
+            <div class="actions">
+              <button type="button" class="button secondary" id="print-ticket"><span class="print-icon" aria-hidden="true"></span>Печать / PDF</button>
+              <button type="button" class="button primary" id="new-ticket"><span class="plus-icon" aria-hidden="true"></span>Новый билет</button>
+            </div>
+          </div>
+          <div class="paper-desk"><article id="ticket" class="paper" aria-label="Тренировочный экзаменационный билет"></article></div>
+
+          <section class="answer-panel" id="answers" aria-labelledby="answers-title">
+            <div class="panel-head">
+              <h2 id="answers-title" tabindex="-1">Ваши ответы</h2>
+              <p id="answers-help">Впишите ответы и нажмите «Проверить ответы», чтобы получить оценку из 30.</p>
+              <p id="dictation-help" hidden>Кнопка «Диктовать» вводит ответ через сервис распознавания речи браузера.</p>
+            </div>
+            <div class="material-switch answer-mode" aria-label="Способ ответа">
+              <button type="button" data-answer-mode="written" aria-pressed="true">Письменно</button>
+              <button type="button" data-answer-mode="voice" aria-pressed="false">Устный экзамен</button>
+            </div>
+            <section id="voice-practice" class="voice-practice" hidden aria-label="Устный экзамен">
+              <p class="voice-help">При первой проверке браузер загрузит модели. Аудио проверяется на этом устройстве. Записи можно скачать до закрытия вкладки.</p>
+              <div class="voice-task">
+                <div class="voice-step"><span id="voice-section"></span><span id="voice-position"></span></div>
+                <h3 id="voice-prompt" tabindex="-1"></h3>
+                <p id="voice-passage" lang="en" hidden></p>
+                <div class="voice-record-actions">
+                  <button type="button" id="voice-record" class="button primary"><span class="record-dot" aria-hidden="true"></span><span id="voice-record-label">Начать ответ</span></button>
+                  <output id="voice-duration" role="timer" aria-label="Длительность записи">00:00</output>
+                </div>
+                <p id="voice-status" class="voice-status" role="status"></p>
+                <div id="voice-playback" hidden>
+                  <audio id="voice-audio" controls preload="metadata" aria-label="Запись ответа"></audio>
+                  <a id="voice-download" class="text-button" download>Скачать запись</a>
+                </div>
+                <details id="voice-transcript-wrap" hidden>
+                  <summary>Уточнить расшифровку</summary>
+                  <label for="voice-transcript">Исправьте слова, которые распознались неверно.</label>
+                  <textarea id="voice-transcript" rows="3" maxlength="4000"></textarea>
+                  <button type="button" id="voice-save-transcript" class="button secondary">Сохранить расшифровку</button>
+                </details>
+                <div class="voice-nav">
+                  <button type="button" id="voice-prev" class="button secondary">Предыдущий</button>
+                  <button type="button" id="voice-next" class="button secondary">Следующий</button>
+                </div>
+              </div>
+              <div class="form-actions">
+                <button type="button" id="voice-check" class="button primary">Проверить устные ответы</button>
+                <button type="button" id="voice-cancel-check" class="button secondary" hidden>Отменить проверку</button>
+                <span id="voice-count"></span>
+              </div>
+              <p id="voice-check-status" class="voice-status" role="status"></p>
+              <progress id="voice-check-progress" aria-label="Ход проверки записей" hidden></progress>
+            </section>
+            <div class="recording" id="written-recording">
+              <button type="button" class="button secondary" id="record"><span class="record-dot" aria-hidden="true"></span>Записать для прослушивания</button>
+              <span id="record-status" role="status"></span>
+              <div id="record-playback" hidden><audio id="record-audio" controls></audio><a id="record-download" class="text-button" download>Скачать запись</a></div>
+            </div>
+            <form id="answer-form">
+              <div id="answer-fields"></div>
+              <div class="form-actions"><button type="submit" class="button primary" id="review-button">Проверить ответы</button><span id="storage-status">Ответы сохраняются в этом браузере.</span></div>
+            </form>
+          </section>
+          <section class="answer-panel" id="review" hidden aria-labelledby="review-title">
+            <div class="panel-head">
+              <h2 id="review-title" tabindex="-1">Результат проверки</h2>
+              <p id="review-method">Тренажёр сверяет термины со словарём и ищет ключевые мысли в развёрнутых ответах. Оценка ориентировочная и учитывает текст ответа.</p>
+            </div>
+            <p id="review-voice-note" class="voice-status" role="status" hidden></p>
+            <div class="result-summary">
+              <div><span>Итог за билет</span><output id="review-total" aria-live="polite">0 / 30</output></div>
+              <dl class="result-parts">
+                <div><dt>Терминология</dt><dd id="result-part-1">0 / 10</dd></div>
+                <div><dt>Беседа</dt><dd id="result-part-2">0 / 12</dd></div>
+                <div><dt>Перевод</dt><dd id="result-part-3">0 / 8</dd></div>
+              </dl>
+            </div>
+            <div class="form-actions review-actions">
+              <button type="button" class="button primary" id="save-attempt">Сохранить результат</button>
+              <button type="button" class="text-button" id="edit-answers">Вернуться к ответам</button>
+            </div>
+            <p class="save-message" id="save-status" role="status"></p>
+            <div id="review-record" class="recording" hidden><strong>Ваш устный ответ</strong><audio id="review-audio" controls></audio></div>
+            <div id="review-fields"></div>
+          </section>
+        </div>
+
+        <aside class="sidebar" aria-label="Подготовка и баллы">
+          <section class="side-card timer-card">
+            <header><span class="timer-icon" aria-hidden="true"></span><h2>Время на подготовку</h2></header>
+            <div id="timer-clock" class="timer-clock" role="timer" aria-label="Оставшееся время">00:40</div>
+            <div id="timer-progress" class="timer-track"><span></span></div>
+            <p id="timer-status" role="status">Выберите длительность отсчёта.</p>
+            <div class="timer-options" aria-label="Длительность подготовки">
+              <button type="button" data-seconds="30">30 сек</button>
+              <button type="button" data-seconds="40" aria-pressed="true">40 сек</button>
+              <button type="button" data-seconds="50">50 сек</button>
+            </div>
+            <button type="button" id="timer-toggle" class="button secondary timer-toggle">Запустить отсчёт</button>
+            <button type="button" id="go-to-answers" class="text-button answers-link">К ответам</button>
+          </section>
+          <section class="side-card score-card">
+            <header><h2>Тренировочная оценка</h2><span class="score-cap">из 30</span></header>
+            <div id="sidebar-score" class="score-display">—</div>
+            <dl class="score-parts">
+              <div><dt>Терминология</dt><dd id="part-score-1">10</dd></div>
+              <div><dt>Беседа по четырём темам</dt><dd id="part-score-2">12</dd></div>
+              <div><dt>Перевод с листа</dt><dd id="part-score-3">8</dd></div>
+            </dl>
+            <details class="rubric">
+              <summary>Как выставляются баллы</summary>
+              <p>Рабочая шкала тренажёра. Вес заданий на экзамене уточните у преподавателя.</p>
+              <p>За лексику и аббревиатуры — по 1 баллу, за определение — до 2. Каждый вопрос беседы оценивается до 3 баллов, перевод — до 8. В устном режиме до 0,5 балла за каждый вопрос беседы даёт оценка произношения по записи.</p>
+            </details>
+          </section>
+        </aside>
+      </div>
+    </section>
+
+    <section id="page-materials" class="page alternate" hidden>
+      <div class="panel-head"><h2>Материалы курса</h2><p>Повторяйте темы, сверяйтесь со словарём и слушайте записи из второй части пособия.</p></div>
+      <div class="material-switch" aria-label="Вид материалов">
+        <button type="button" data-material="topics" aria-pressed="true">16 тем</button>
+        <button type="button" data-material="translations">Лексика</button>
+        <button type="button" data-material="definitions">Определения</button>
+        <button type="button" data-material="abbreviations">Аббревиатуры</button>
+        <button type="button" data-material="audio">Аудио</button>
+      </div>
+      <div id="material-search-row">
+        <label class="search-label" for="material-search">Поиск по материалам</label>
+        <input type="search" id="material-search" placeholder="Введите слово или название темы">
+      </div>
+      <div id="material-output"></div>
+      <details class="rubric source-note"><summary>Об учебных материалах</summary><p>Словарь составлен по трём предоставленным PDF. В разделе «Аудио» собраны записи из архива второй части. Вопросы, примеры ответов и фрагменты для перевода подготовлены для тренировки.</p><p><a href="https://catalog.inforeg.ru/Inet/GetEzineByID/342740" target="_blank" rel="noopener">Essential English for IT Students · Part 1</a><br><a href="https://catalog.inforeg.ru/Inet/GetEzineByID/344592" target="_blank" rel="noopener">Essential English for IT Students · Part 2</a></p></details>
+    </section>
+
+    <section id="page-history" class="page alternate" hidden>
+      <div class="panel-head"><h2>История попыток</h2><p>Результаты самопроверки в этом браузере.</p></div>
+      <div id="history-content"></div>
+    </section>
+    <footer class="footer"><span>Английский для ИТ</span><span>Тренажёр для самостоятельной подготовки</span></footer>
+  </main>
+
+  <dialog id="date-dialog">
+    <form method="dialog" class="dialog-form">
+      <h2>Дата экзамена</h2>
+      <p>Отсчёт ведётся по календарным дням в московском часовом поясе.</p>
+      <label for="date-input">Выберите дату</label>
+      <input type="date" id="date-input" required min="2020-01-01" max="2099-12-31">
+      <div class="actions"><button class="button secondary" value="cancel" formnovalidate>Отмена</button><button class="button primary" value="save">Сохранить</button></div>
+    </form>
+  </dialog>
+  <dialog id="ticket-dialog">
+    <form method="dialog" class="dialog-form">
+      <h2>Открыть новый билет?</h2>
+      <p>В текущем билете есть ответы или записи. Сохраните результат и скачайте нужные записи, если хотите к ним вернуться.</p>
+      <div class="actions"><button class="button secondary" value="cancel" autofocus>Продолжить текущий</button><button class="button primary" value="new">Открыть новый</button></div>
+    </form>
+  </dialog>
+  <noscript><p class="shell">Включите JavaScript, чтобы собрать билет и воспользоваться таймером.</p></noscript>
+</body>
+</html>

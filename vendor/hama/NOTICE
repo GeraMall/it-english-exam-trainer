@@ -1,0 +1,10 @@
+Hama, version 1.7.0
+Copyright (c) 2025 Hama contributors
+
+browser.js bundles the G2P and ASR browser exports of the hama-js
+1.7.0 npm package. assets/hama.wasm is the unmodified runtime binary
+from that package. The npm package declares Apache-2.0. The upstream
+source repository also provides the MIT notice in LICENSE.
+
+Upstream source: https://github.com/hamanlp/hama
+Npm release: https://www.npmjs.com/package/hama-js/v/1.7.0
