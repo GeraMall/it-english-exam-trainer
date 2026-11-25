@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#234787">
   <title>Английский для ИТ · Экзаменационный тренажёр</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="styles.css?v=4">
+  <link rel="stylesheet" href="styles.css?v=5">
   <script defer src="data/vocabulary.js"></script>
   <script defer src="data/course.js"></script>
   <script defer src="grading.js"></script>
@@ -17,7 +17,8 @@
   <script defer src="voice.js"></script>
   <script defer src="study-data.js"></script>
   <script defer src="study-audio.js"></script>
-  <script defer src="study.js?v=2"></script>
+  <script defer src="study-plan.js"></script>
+  <script defer src="study.js?v=3"></script>
   <script defer src="app.js?v=4"></script>
 </head>
 <body>
@@ -27,15 +28,12 @@
         <span class="brand-icon" aria-hidden="true"><i></i></span>
         <span>Английский для ИТ</span>
       </a>
-      <span class="bar-aside">Учебный кабинет</span>
     </div>
   </header>
   <main class="shell">
     <div class="intro">
       <div>
-        <nav class="breadcrumbs" aria-label="Расположение"><a href="#materials">Иностранный язык</a><span aria-hidden="true">/</span><span>3–4-й семестры</span></nav>
         <h1>Экзаменационный тренажёр</h1>
-        <p>Подготовка к устному экзамену по курсу Essential English for IT Students</p>
       </div>
       <button type="button" class="exam-date" id="edit-date" aria-label="Изменить дату экзамена">
         <span class="calendar-icon" aria-hidden="true"></span>
@@ -50,29 +48,48 @@
       <a href="#history" data-page="history">История</a>
     </nav>
 
-    <section id="page-practice" class="page study-layout">
-      <aside class="study-sidebar" aria-label="Задания для подготовки">
-        <div class="study-menu">
-          <h2>Задания для подготовки</h2>
-          <nav id="study-modes" aria-label="Виды заданий"></nav>
-          <button type="button" class="button secondary study-repeat" id="study-review"><span>Повторить карточки</span><span id="study-due">0</span></button>
-        </div>
-        <div class="study-progress">
-          <h2>Мой прогресс</h2>
-          <p id="study-progress"></p>
-          <progress id="study-progress-bar" max="5" value="0" aria-label="Виды заданий, которые вы попробовали"></progress>
-          <p class="study-progress-note">Когда поработаете с каждым видом задания, соберите пробный билет на время.</p>
-          <a class="text-button" href="#trainer">К пробному экзамену</a>
-        </div>
-      </aside>
-
-      <div class="study-workspace">
-        <div class="study-heading">
-          <div>
-            <h2 id="study-title" tabindex="-1">Лексика</h2>
-            <p id="study-intro">Начните с одного термина. Если нужно, откройте подсказку.</p>
+    <section id="page-practice" class="page study-page">
+      <div class="study-dashboard" id="study-dashboard">
+        <section class="daily-card" aria-labelledby="study-today-title">
+          <header class="report-header"><h2 id="study-today-title">Сегодня</h2><span id="study-today" class="report-meta" aria-live="polite"></span></header>
+          <ul class="plan-tasks" id="study-tasks" aria-label="План на сегодня"></ul>
+          <div class="today-actions">
+            <button type="button" class="button primary" id="study-start-plan">Начать тренировку</button>
+            <span id="study-focus" class="report-meta"></span>
           </div>
-          <label id="study-topic-filter" hidden><span>Тема</span><select id="study-topic" aria-label="Тема устного вопроса"></select></label>
+        </section>
+        <section class="goal-card" aria-labelledby="study-goal-title">
+          <header class="report-header">
+            <h2 id="study-goal-title">Цель к экзамену</h2>
+            <label class="goal-edit" for="study-goal"><span>Цель</span><select id="study-goal" aria-label="Цель в баллах"></select></label>
+          </header>
+          <div class="goal-values">
+            <div><p class="report-meta">Последний пробный</p><output class="goal-value" id="study-goal-result">—</output></div>
+            <p id="study-goal-status" class="report-meta">Пока нет оценки</p>
+          </div>
+          <div class="goal-scale" id="study-goal-scale" role="img" aria-label="Шкала баллов от 0 до 30">
+            <div class="goal-track"><span class="goal-actual" id="study-goal-actual"></span><span class="goal-marker"></span></div>
+            <div class="goal-ticks" aria-hidden="true"><span>0</span><span>10</span><span>20</span><span>30</span></div>
+          </div>
+          <details class="goal-details" id="study-goal-breakdown" hidden>
+            <summary>Баллы по частям</summary>
+            <dl id="study-goal-parts"></dl>
+          </details>
+        </section>
+      </div>
+
+      <section class="study-workspace" id="study-workspace" aria-labelledby="study-practice-title">
+        <div class="practice-toolbar">
+          <h2 id="study-practice-title">Упражнения</h2>
+          <button type="button" class="button secondary study-repeat" id="study-review"><span>Повторить</span><span id="study-due">0</span></button>
+        </div>
+        <nav id="study-modes" aria-label="Виды заданий"></nav>
+        <div class="study-heading">
+          <h3 id="study-title" tabindex="-1" hidden>Повторение</h3>
+          <div class="study-options">
+            <label id="study-topic-filter" hidden><span>Тема</span><select id="study-topic" aria-label="Тема устного вопроса"></select></label>
+            <details class="study-guide" id="study-guide"><summary>Как отвечать</summary><p id="study-intro"></p></details>
+          </div>
         </div>
 
         <article class="study-card" id="study-card" aria-labelledby="study-prompt">
@@ -85,7 +102,7 @@
             </div>
           </div>
           <form id="study-form">
-            <label for="study-answer" id="study-answer-label">Ваш ответ</label>
+            <label for="study-answer" id="study-answer-label">Ответ</label>
             <textarea id="study-answer" aria-describedby="study-form-status" rows="2" maxlength="4000"></textarea>
             <div class="study-audio" id="study-audio" hidden>
               <div class="study-buttons">
@@ -99,7 +116,7 @@
             <p id="study-form-status" class="study-note form-note" role="status"></p>
             <div class="study-buttons study-actions">
               <button type="submit" class="button primary" id="study-check">Проверить</button>
-              <button type="button" class="button secondary" id="study-hint">Подсказка</button>
+              <button type="button" class="text-button" id="study-hint">Подсказка</button>
               <button type="button" class="text-button" id="study-reveal">Показать ответ</button>
             </div>
             <ul id="study-hints" class="study-hints" aria-live="polite" hidden></ul>
@@ -119,7 +136,7 @@
           </div>
         </div>
         <p class="study-note" id="study-storage-status" role="status"></p>
-      </div>
+      </section>
     </section>
 
     <section id="page-trainer" class="page" hidden>

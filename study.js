@@ -2,6 +2,7 @@
   "use strict";
 
   const bank = window.EXAM_STUDY_DATA;
+  const planner = window.EXAM_STUDY_PLAN;
   const $ = (id) => document.getElementById(id);
   if (!bank) {
     $("study-intro").textContent = "Банк упражнений не загрузился. Обновите страницу или откройте материалы курса.";
@@ -11,19 +12,29 @@
 
   const progressKey = "it-english-exam:v1:study";
   const sessionKey = "it-english-exam:v1:study-session";
+  const goalKey = "it-english-exam:v1:study-goal";
+  const ledgerKey = "it-english-exam:v1:study-day";
+  const historyKey = "it-english-exam:v1:history";
   const shortModes = new Set(["vocab", "abbreviations"]);
   const cards = new Map(bank.modes.flatMap(({ id }) => bank.catalog[id].map((item) => [item.id, item])));
   const exercise = {
-    vocab: { instruction: "Переведите на английский", intro: "Вспомните английский термин. После проверки можно повторить его по памяти.", placeholder: "Термин на английском" },
-    definitions: { instruction: "Объясните термин на английском", intro: "Назовите, что это такое и для чего используется. Достаточно одного или двух предложений.", placeholder: "Определение на английском" },
-    abbreviations: { instruction: "Расшифруйте аббревиатуру", intro: "Напишите полное название по-английски. Подсказка поможет вспомнить первые слова.", placeholder: "Полная расшифровка" },
-    topics: { instruction: "Ответьте на вопрос по-английски", intro: "Попробуйте объяснить своими словами. В разборе сравните ответ с опорными мыслями.", placeholder: "Ответ на английском" },
-    passages: { instruction: "Переведите фрагмент на русский", intro: "Передайте смысл и связи между предложениями. Длинный фрагмент можно разбить на предложения.", placeholder: "Перевод на русский" },
+    vocab: { instruction: "Переведите на английский", intro: "Вспомните английский термин. После проверки попробуйте повторить его по памяти.", placeholder: "Английский термин" },
+    definitions: { instruction: "Дайте определение", intro: "По-английски назовите, что это такое и для чего используется. Достаточно одного или двух предложений.", placeholder: "Определение на английском" },
+    abbreviations: { instruction: "Расшифруйте по-английски", intro: "Напишите полное название. Подсказка поможет вспомнить первые слова.", placeholder: "Полное название" },
+    topics: { instruction: "Ответьте по-английски", intro: "Объясните своими словами и сравните ответ с опорными мыслями в разборе.", placeholder: "Ответ на английском" },
+    passages: { instruction: "Переведите на русский", intro: "Передайте смысл и связи между предложениями. Фрагмент можно разбить на предложения.", placeholder: "Перевод" },
   };
   const modeNames = new Map(bank.modes.map(({ id, title }) => [id, title]));
+  const tabNames = { vocab: "Термины", definitions: "Определения", abbreviations: "Аббревиатуры", topics: "Беседа", passages: "Перевод текста" };
+  const sectionNames = { terms: "Терминология", topics: "Беседа", passages: "Перевод" };
+  const taskNames = { review: "Повторение", terms: "Терминология", topics: "Вопросы по темам", passages: "Перевод текста", mock: "Пробный билет" };
   const formatNumber = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 });
+  const plural = new Intl.PluralRules("ru-RU");
   const visit = new Set();
   let progress = read(progressKey);
+  let goal = planner?.normalizeTarget(read(goalKey, 20)) ?? 20;
+  let ledger = read(ledgerKey);
+  let plan = null;
   const saved = read(sessionKey);
   let mode = modeNames.has(saved.mode) ? saved.mode : "vocab";
   let topicId = window.EXAM_COURSE.topics.some((topic) => topic.id === saved.topicId) ? saved.topicId : "";
@@ -35,7 +46,8 @@
   function read(key, fallback = {}) {
     try {
       const value = JSON.parse(localStorage.getItem(key));
-      return value && typeof value === "object" ? value : fallback;
+      if (Array.isArray(fallback)) return Array.isArray(value) ? value : fallback;
+      return value !== null && typeof value === typeof fallback ? value : fallback;
     } catch {
       return fallback;
     }
@@ -72,22 +84,61 @@
     });
   }
 
+  function points(value) {
+    const form = { one: "балл", few: "балла", many: "баллов", other: "балла" };
+    return `${formatNumber.format(value)} ${form[plural.select(value)]}`;
+  }
+
+  function renderPlan() {
+    if (!planner) {
+      $("study-start-plan").disabled = true;
+      $("study-goal").disabled = true;
+      return;
+    }
+    plan = planner.build({ history: read(historyKey, []), progress, target: goal, ledger });
+    const { baseline, target, gap, tasks, completed, todayCards } = plan;
+    const next = tasks.find(({ count, done }) => done < count);
+    $("study-today").textContent = `${completed} из ${tasks.length} шагов`;
+    $("study-tasks").innerHTML = tasks.map((task) => {
+      const name = taskNames[task.id] ?? task.label;
+      const complete = task.done >= task.count;
+      return `<li><button type="button" class="plan-task" data-plan-task="${task.id}" data-complete="${complete}"
+        aria-label="${escapeHtml(name)}, ${task.done} из ${task.count}${complete ? ", выполнено" : ""}">
+        <span class="plan-check" aria-hidden="true"></span><span class="plan-label">${escapeHtml(name)}</span>
+        <span class="plan-count">${task.done} / ${task.count}</span>
+      </button></li>`;
+    }).join("");
+    $("study-start-plan").textContent = next?.id === "mock" || !next ? "К пробному билету" : todayCards ? "Продолжить" : "Начать тренировку";
+    $("study-focus").textContent = !next ? "План на сегодня выполнен" :
+      next.id === "review" ? "Начните с повторения" :
+        baseline && gap > 0 ? `Фокус · ${sectionNames[plan.focus]}` : "";
+
+    $("study-goal").value = String(target);
+    $("study-goal-result").textContent = baseline ? `${formatNumber.format(baseline.total)} / 30` : "—";
+    $("study-goal-status").textContent = baseline ? gap > 0 ? `До цели ${points(gap)}` : "Цель достигнута" : "Пока нет оценки";
+    $("study-goal-status").classList.toggle("goal-reached", baseline && gap === 0);
+    const scale = $("study-goal-scale");
+    scale.style.setProperty("--target", `${target / 30 * 100}%`);
+    scale.style.setProperty("--actual", `${(baseline?.total ?? 0) / 30 * 100}%`);
+    scale.setAttribute("aria-label", `Шкала от 0 до 30, цель ${points(target)}${baseline ? `, последний пробный ${points(baseline.total)}` : ""}`);
+    $("study-goal-actual").hidden = !baseline;
+    $("study-goal-breakdown").hidden = !baseline;
+    if (baseline) {
+      $("study-goal-parts").innerHTML = ["terms", "topics", "passages"].map((id, index) =>
+        `<div><dt>${sectionNames[id]}</dt><dd>${formatNumber.format(baseline.parts[index])} / ${[10, 12, 8][index]}</dd></div>`).join("");
+    }
+  }
+
   function renderProgress() {
     const totals = bank.stats(progress);
-    let startedModes = 0;
     document.querySelectorAll("#study-modes [data-mode]").forEach((button) => {
-      const id = button.dataset.mode;
-      const info = totals.modes[id];
-      startedModes += Number(info.attempted > 0);
-      button.querySelector(".study-mode-count").textContent = `${info.attempted} / ${info.total}`;
-      button.setAttribute("aria-pressed", String(!reviewing && id === mode));
+      button.setAttribute("aria-pressed", String(!reviewing && button.dataset.mode === mode));
     });
-    $("study-progress").textContent = `Виды заданий ${startedModes} из ${bank.modes.length} · Карточек разобрано ${totals.attempted}`;
-    $("study-progress-bar").value = startedModes;
     $("study-due").textContent = totals.due;
     $("study-review").disabled = !totals.due && !reviewing;
     $("study-review").setAttribute("aria-pressed", String(reviewing));
-    $("study-review").firstElementChild.textContent = reviewing ? "Выйти из повторения" : "Повторить карточки";
+    $("study-review").firstElementChild.textContent = reviewing ? "Выйти из повторения" : "Повторить";
+    renderPlan();
   }
 
   function reviewedItem() {
@@ -134,6 +185,29 @@
   function moveToNext(focus = true) {
     begin(nextItem());
     if (focus) $(round ? "study-prompt" : "study-empty-action").focus();
+  }
+
+  function startTask(task) {
+    if (!task || task.id === "mock") {
+      location.hash = "trainer";
+      return;
+    }
+    if (task.id === "review") {
+      if (reviewing && round && !round.finished) {
+        $("study-prompt").focus();
+        return;
+      }
+      reviewing = true;
+      visit.clear();
+    } else {
+      if (!reviewing && mode === task.mode && round && !round.finished) {
+        $("study-prompt").focus();
+        return;
+      }
+      mode = task.mode;
+      reviewing = false;
+    }
+    moveToNext();
   }
 
   function passage() {
@@ -187,6 +261,7 @@
     renderProgress();
     const displayMode = round?.item.mode ?? mode;
     $("study-title").textContent = reviewing ? "Повторение" : modeNames.get(displayMode);
+    $("study-title").hidden = !reviewing;
     $("study-intro").textContent = reviewing ? "Вспомните ответы на карточки, у которых подошло время повторения." : exercise[displayMode].intro;
     $("study-topic-filter").hidden = reviewing || mode !== "topics";
     $("study-topic").value = topicId;
@@ -220,6 +295,7 @@
     $("study-check").hidden = finished;
     $("study-reveal").hidden = finished;
     $("study-next").textContent = finished ? "Следующее упражнение" : "Пропустить";
+    $("study-card").dataset.finished = String(finished);
     $("study-next").classList.toggle("primary", finished);
     $("study-next").classList.toggle("secondary", !finished);
     renderHints();
@@ -240,10 +316,21 @@
     round.finished = true;
     round.revealed = revealed;
     round.result = result;
-    progress = bank.record(read(progressKey, progress), round.item, {
+    const before = read(progressKey, progress);
+    const now = Date.now();
+    const previous = before.items?.[round.item.id];
+    progress = bank.record(before, round.item, {
       outcome: result?.outcome ?? "incorrect",
       helped: revealed || round.assisted || round.shownHints > 0,
-    });
+    }, now);
+    if (result && planner) {
+      ledger = planner.record(read(ledgerKey, ledger), {
+        id: round.item.id,
+        mode: round.item.mode,
+        reviewed: reviewing || Number.isFinite(previous?.dueAt) && previous.dueAt <= now,
+      }, now);
+      write(ledgerKey, ledger);
+    }
     write(progressKey, progress);
     saveSession();
     render();
@@ -301,10 +388,14 @@
     renderAudio(state);
   }
 
-  $("study-modes").innerHTML = bank.modes.map(({ id, title }) => `
+  $("study-modes").innerHTML = bank.modes.map(({ id }) => `
     <button type="button" class="study-mode" data-mode="${id}" aria-pressed="false">
-      <span>${escapeHtml(title)}</span><span class="study-mode-count"></span>
+      ${escapeHtml(tabNames[id])}
     </button>`).join("");
+  $("study-goal").innerHTML = Array.from({ length: 21 }, (_, index) => {
+    const value = index + 10;
+    return `<option value="${value}">${value} / 30</option>`;
+  }).join("");
   $("study-topic").innerHTML = '<option value="">Все 16 тем</option>' +
     [3, 4].map((semester) => `<optgroup label="${semester}-й семестр">${window.EXAM_COURSE.topics.filter((item) => item.semester === semester)
       .map(({ id, title }) => `<option value="${escapeHtml(id)}">${escapeHtml(title)}</option>`).join("")}</optgroup>`).join("");
@@ -324,6 +415,20 @@
     reviewing = !reviewing;
     if (reviewing) visit.clear();
     moveToNext();
+  });
+  $("study-goal").addEventListener("change", (event) => {
+    if (!planner) return;
+    goal = planner.normalizeTarget(event.target.value);
+    write(goalKey, goal);
+    renderPlan();
+  });
+  $("study-start-plan").addEventListener("click", () => {
+    if (plan) startTask(plan.tasks.find(({ count, done }) => done < count));
+  });
+  $("study-tasks").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-plan-task]");
+    const task = button && plan?.tasks.find(({ id }) => id === button.dataset.planTask);
+    if (task) startTask(task);
   });
   $("study-empty-action").addEventListener("click", () => {
     if (!bank.stats(progress).due) reviewing = false;
@@ -389,9 +494,14 @@
   window.addEventListener("storage", (event) => {
     if (event.key === progressKey) {
       progress = read(progressKey);
-      renderProgress();
     }
+    if (event.key === ledgerKey) ledger = read(ledgerKey);
+    if (event.key === goalKey) goal = planner?.normalizeTarget(read(goalKey, 20)) ?? 20;
+    if ([progressKey, ledgerKey, goalKey, historyKey].includes(event.key)) renderProgress();
   });
+  setInterval(() => {
+    if (visible && plan?.day !== planner?.day()) renderProgress();
+  }, 5_000);
 
   const previous = cards.get(saved.itemId);
   if (previous && (reviewing || (previous.mode === mode && (!topicId || mode !== "topics" || previous.topicId === topicId)))) {
