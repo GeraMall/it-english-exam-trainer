@@ -19,18 +19,20 @@
   const cards = new Map(bank.modes.flatMap(({ id }) => bank.catalog[id].map((item) => [item.id, item])));
   const exercise = {
     vocab: { instruction: "Переведите на английский", intro: "Вспомните английский термин. После проверки попробуйте повторить его по памяти.", placeholder: "Английский термин" },
-    definitions: { instruction: "Дайте определение", intro: "По-английски назовите, что это такое и для чего используется. Достаточно одного или двух предложений.", placeholder: "Определение на английском" },
+    definitions: { instruction: "Дайте определение", intro: "Назовите категорию и отличительный признак или назначение. Можно начать с «It is a … that …».", placeholder: "Определение на английском" },
     abbreviations: { instruction: "Расшифруйте по-английски", intro: "Напишите полное название. Подсказка поможет вспомнить первые слова.", placeholder: "Полное название" },
-    topics: { instruction: "Ответьте по-английски", intro: "Объясните своими словами и сравните ответ с опорными мыслями в разборе.", placeholder: "Ответ на английском" },
-    passages: { instruction: "Переведите на русский", intro: "Передайте смысл и связи между предложениями. Фрагмент можно разбить на предложения.", placeholder: "Перевод" },
+    topics: { instruction: "Ответьте по-английски", intro: "Ответьте прямо, объясните принцип и добавьте пример. Для сравнения назовите обе стороны и ключевое различие.", placeholder: "Ответ на английском" },
+    passages: { instruction: "Переведите на русский", intro: "Сначала найдите главную мысль. При переводе сохраните терминологию, условия и связи между предложениями.", placeholder: "Перевод" },
   };
   const modeNames = new Map(bank.modes.map(({ id, title }) => [id, title]));
   const tabNames = { vocab: "Термины", definitions: "Определения", abbreviations: "Аббревиатуры", topics: "Беседа", passages: "Перевод текста" };
   const sectionNames = { terms: "Терминология", topics: "Беседа", passages: "Перевод" };
-  const taskNames = { review: "Повторение", terms: "Терминология", topics: "Вопросы по темам", passages: "Перевод текста", mock: "Пробный билет" };
+  const taskNames = { review: "Повторение", terms: "Терминология", topics: "Вопросы по темам", passages: "Перевод текста" };
   const formatNumber = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 });
   const plural = new Intl.PluralRules("ru-RU");
+  const selectionNames = new Set(["today", "review", ...modeNames.keys()]);
   const visit = new Set();
+  const drafts = new Map();
   let progress = read(progressKey);
   let goal = planner?.normalizeTarget(read(goalKey, 20)) ?? 20;
   let ledger = read(ledgerKey);
@@ -39,9 +41,11 @@
   let mode = modeNames.has(saved.mode) ? saved.mode : "vocab";
   let topicId = window.EXAM_COURSE.topics.some((topic) => topic.id === saved.topicId) ? saved.topicId : "";
   let reviewing = saved.reviewing === true;
-  let visible = false;
+  let selection = selectionNames.has(saved.selection) ? saved.selection : reviewing ? "review" : mode;
+  let activePage = "";
   let round = null;
   let audioRequest = null;
+  const recent = Array.isArray(saved.recent) ? saved.recent.filter((id) => cards.has(id)).slice(-3) : [];
 
   function read(key, fallback = {}) {
     try {
@@ -69,8 +73,9 @@
 
   const audio = window.EXAM_STUDY_AUDIO?.create({ onChange: audioChanged });
 
-  function saveSession() {
-    write(sessionKey, {
+  function sessionSnapshot() {
+    return {
+      selection,
       mode,
       topicId,
       reviewing,
@@ -81,12 +86,40 @@
       finished: round?.finished,
       revealed: round?.revealed,
       split: round?.split,
-    });
+      recent,
+    };
+  }
+
+  function saveSession() {
+    write(sessionKey, sessionSnapshot());
   }
 
   function points(value) {
     const form = { one: "балл", few: "балла", many: "баллов", other: "балла" };
     return `${formatNumber.format(value)} ${form[plural.select(value)]}`;
+  }
+
+  function exerciseCount(value) {
+    const form = { one: "упражнение", few: "упражнения", many: "упражнений", other: "упражнения" };
+    return `${value} ${form[plural.select(value)]}`;
+  }
+
+  function guidedTask() {
+    return plan?.tasks.find(({ id, count, done }) => id !== "mock" && done < count);
+  }
+
+  function renderReadiness(history) {
+    const attempts = history.filter((row) => row?.mode === "voice" && row.full && row.timed && !row.preliminary &&
+      Number.isFinite(row.total) && row.total >= 0 && row.total <= 30 && Date.parse(row.at) <= Date.now())
+      .sort((first, second) => Date.parse(second.at) - Date.parse(first.at));
+    let streak = 0;
+    for (const row of attempts.slice(0, 2)) {
+      if (row.total < goal) break;
+      streak++;
+    }
+    $("study-readiness").textContent = streak >= 2 ?
+      "Два полных устных билета подряд на цель. Проверьте себя на новом билете." :
+      `Устные билеты на цель подряд · ${streak} / 2. В зачёт идут все три части с таймером.`;
   }
 
   function renderPlan() {
@@ -95,11 +128,13 @@
       $("study-goal").disabled = true;
       return;
     }
-    plan = planner.build({ history: read(historyKey, []), progress, target: goal, ledger });
-    const { baseline, target, gap, tasks, completed, todayCards } = plan;
-    const next = tasks.find(({ count, done }) => done < count);
-    $("study-today").textContent = `${completed} из ${tasks.length} шагов`;
-    $("study-tasks").innerHTML = tasks.map((task) => {
+    const history = read(historyKey, []);
+    plan = planner.build({ history, progress, target: goal, ledger });
+    const { baseline, target, gap, tasks, workload, dailyMinutes } = plan;
+    const next = guidedTask();
+    $("study-today").textContent = `${workload.done} / ${workload.count} упражнений`;
+    $("study-goal-impact").textContent = `${exerciseCount(workload.count)} сегодня · ≈ ${dailyMinutes} мин`;
+    $("study-tasks").innerHTML = tasks.filter(({ id }) => id !== "mock").map((task) => {
       const name = taskNames[task.id] ?? task.label;
       const complete = task.done >= task.count;
       return `<li><button type="button" class="plan-task" data-plan-task="${task.id}" data-complete="${complete}"
@@ -108,7 +143,7 @@
         <span class="plan-count">${task.done} / ${task.count}</span>
       </button></li>`;
     }).join("");
-    $("study-start-plan").textContent = next?.id === "mock" || !next ? "К пробному билету" : todayCards ? "Продолжить" : "Начать тренировку";
+    $("study-start-plan").textContent = !next ? "К полному экзамену" : workload.done ? "Продолжить тренировку" : "Начать тренировку";
     $("study-focus").textContent = !next ? "План на сегодня выполнен" :
       next.id === "review" ? "Начните с повторения" :
         baseline && gap > 0 ? `Фокус · ${sectionNames[plan.focus]}` : "";
@@ -122,11 +157,16 @@
     scale.style.setProperty("--actual", `${(baseline?.total ?? 0) / 30 * 100}%`);
     scale.setAttribute("aria-label", `Шкала от 0 до 30, цель ${points(target)}${baseline ? `, последний пробный ${points(baseline.total)}` : ""}`);
     $("study-goal-actual").hidden = !baseline;
-    $("study-goal-breakdown").hidden = !baseline;
+    $("study-goal-parts").hidden = !baseline;
     if (baseline) {
       $("study-goal-parts").innerHTML = ["terms", "topics", "passages"].map((id, index) =>
         `<div><dt>${sectionNames[id]}</dt><dd>${formatNumber.format(baseline.parts[index])} / ${[10, 12, 8][index]}</dd></div>`).join("");
     }
+    renderReadiness(history);
+    $("study-training-meter").hidden = selection !== "today";
+    $("study-session-progress").max = workload.count;
+    $("study-session-progress").value = workload.done;
+    $("study-session-count").textContent = `${workload.done} из ${workload.count}`;
   }
 
   function renderProgress() {
@@ -135,19 +175,19 @@
       button.setAttribute("aria-pressed", String(!reviewing && button.dataset.mode === mode));
     });
     $("study-due").textContent = totals.due;
-    $("study-review").disabled = !totals.due && !reviewing;
-    $("study-review").setAttribute("aria-pressed", String(reviewing));
-    $("study-review").firstElementChild.textContent = reviewing ? "Выйти из повторения" : "Повторить";
+    $("study-review").disabled = !totals.due && selection !== "review";
+    $("study-review").setAttribute("aria-pressed", String(selection === "review"));
+    $("study-review").firstElementChild.textContent = selection === "review" ? "К тренировке" : "Повторить";
     renderPlan();
   }
 
-  function reviewedItem() {
+  function reviewedItem(exclude = [...visit]) {
     const selectedMode = round?.item.mode ?? mode;
     const order = bank.modes.map(({ id }) => id);
     const position = order.indexOf(selectedMode);
     const rotated = [...order.slice(position + 1), ...order.slice(0, position + 1)];
     for (const id of rotated) {
-      const item = bank.pick(id, progress, { reviewOnly: true, exclude: [...visit] });
+      const item = bank.pick(id, progress, { reviewOnly: true, exclude });
       if (item) return item;
     }
     return null;
@@ -188,26 +228,69 @@
   }
 
   function startTask(task) {
-    if (!task || task.id === "mock") {
-      location.hash = "trainer";
+    openTraining(task.id === "review" ? "review" : task.mode);
+  }
+
+  function openTraining(nextSelection) {
+    location.hash = `train?mode=${nextSelection}`;
+  }
+
+  function advanceGuided(focus = true) {
+    renderPlan();
+    const checked = new Set(Object.keys(ledger.days?.[plan?.day] ?? {}));
+    const reviewed = [...checked].filter((id) => ledger.days[plan.day][id].reviewed);
+    const lesson = plan?.tasks.filter(({ id, count, done }) => id !== "mock" && done < count) ?? [];
+    let item = null;
+    let repeatLater = false;
+    for (const task of lesson) {
+      if (task.id === "review") {
+        const exclude = [...reviewed, ...recent, ...(round ? [round.item.id] : [])];
+        item = reviewedItem(exclude);
+        repeatLater = !item;
+      } else {
+        const exclude = [...new Set([...checked, ...visit])];
+        item = bank.pick(task.mode, progress, { exclude }) ??
+          bank.pick(task.mode, progress, { exclude: [...checked, ...(round ? [round.item.id] : [])] });
+      }
+      if (item) {
+        reviewing = task.id === "review";
+        mode = item.mode;
+        break;
+      }
+    }
+    if (!item && repeatLater) {
+      item = reviewedItem([...reviewed, ...(round ? [round.item.id] : [])]);
+      reviewing = !!item;
+      if (item) mode = item.mode;
+    }
+    begin(item);
+    if (focus) $(round ? "study-prompt" : "study-empty-title").focus();
+  }
+
+  function selectTraining(requested) {
+    const nextSelection = selectionNames.has(requested) ? requested : "today";
+    if (selection === nextSelection && round) {
+      renderProgress();
       return;
     }
-    if (task.id === "review") {
-      if (reviewing && round && !round.finished) {
-        $("study-prompt").focus();
-        return;
-      }
-      reviewing = true;
-      visit.clear();
-    } else {
-      if (!reviewing && mode === task.mode && round && !round.finished) {
-        $("study-prompt").focus();
-        return;
-      }
-      mode = task.mode;
-      reviewing = false;
+    drafts.set(selection, sessionSnapshot());
+    selection = nextSelection;
+    const draft = drafts.get(selection);
+    visit.clear();
+    if (draft && cards.has(draft.itemId)) {
+      mode = draft.mode;
+      reviewing = draft.reviewing;
+      topicId = draft.topicId;
+      begin(cards.get(draft.itemId), draft);
+      return;
     }
-    moveToNext();
+    reviewing = selection === "review";
+    if (selection === "today") {
+      advanceGuided(false);
+      return;
+    }
+    if (!reviewing) mode = selection;
+    moveToNext(false);
   }
 
   function passage() {
@@ -237,23 +320,27 @@
     const solved = shortModes.has(item.mode) ? "Вариант ответа" : "Пример ответа";
     const aliases = (item.aliases ?? []).filter(Boolean).slice(0, 3);
     const checks = result?.checks ?? [];
+    const missing = !shortModes.has(item.mode) && checks.find(({ status }) => status === "missing");
     const practiceNote = revealed || result?.outcome !== "correct" || round.assisted || round.shownHints ?
-      "Карточка доступна в повторении." : "Карточка вернётся позже для проверки по памяти.";
+      "В очереди повторения" : "Повторение запланировано";
     const phonetics = sound?.phonetics;
     el.hidden = false;
     el.dataset.outcome = revealed ? "revealed" : result.outcome;
     el.innerHTML = `
       <h4 id="study-feedback-title" tabindex="-1">${title}${result ? ` · ${formatNumber.format(result.score)} / ${result.max}` : ""}</h4>
-      ${result?.feedback ? `<p>${escapeHtml(result.feedback)}</p>` : ""}
-      ${checks.length ? `<ul class="study-checklist">${checks.map(({ label, status, detail }) => `
+      ${missing ? `<p><strong>Что добавить</strong> · <span lang="${item.mode === "topics" ? "en" : "ru"}">${escapeHtml(missing.label)}</span></p>` :
+        result?.feedback && result.outcome !== "correct" ? `<p>${escapeHtml(result.feedback)}</p>` : ""}
+      <details class="study-feedback-detail" ${revealed || result?.outcome === "incorrect" ? "open" : ""}>
+        <summary>${solved}</summary>
+        <p class="study-answer-model" lang="${item.answerLanguage}">${escapeHtml(item.solution)}</p>
+        ${aliases.length ? `<p>Варианты · <span lang="en">${aliases.map(escapeHtml).join(" / ")}</span></p>` : ""}
+        ${item.answerLanguage === "en" && sound?.canSpeak ? `<button type="button" class="text-button" data-study-speak>${sound.speaking ? "Остановить пример" : "Прослушать пример"}</button>` : ""}
+      </details>
+      ${checks.length && !shortModes.has(item.mode) ? `<details class="study-feedback-detail"><summary>Пункты ответа</summary><ul class="study-checklist">${checks.map(({ label, status, detail }) => `
         <li><span class="check-state ${escapeHtml(status)}">${stateLabels[status] ?? "Сверьте"}</span><span>${escapeHtml(label)}</span>
-          ${detail ? `<small> ${escapeHtml(detail)}</small>` : ""}</li>`).join("")}</ul>` : ""}
-      <p>${solved}</p>
-      <p class="study-answer-model" lang="${item.answerLanguage}">${escapeHtml(item.solution)}</p>
-      ${aliases.length ? `<p>Допустимые варианты · <span lang="en">${aliases.map(escapeHtml).join(" / ")}</span></p>` : ""}
-      ${item.answerLanguage === "en" && sound?.canSpeak ? `<button type="button" class="text-button" data-study-speak>${sound.speaking ? "Остановить пример" : "Прослушать пример"}</button>` : ""}
-      ${Number.isFinite(phonetics?.score) ? `<p>Приблизительное совпадение звуков ${Math.round(phonetics.score * 100)}%.</p>` : ""}
-      ${phonetics?.feedback ? `<p>${escapeHtml(phonetics.feedback)}</p>` : ""}
+          ${detail ? `<small> ${escapeHtml(detail)}</small>` : ""}</li>`).join("")}</ul></details>` : ""}
+      ${Number.isFinite(phonetics?.score) ? `<p>Приблизительное совпадение звуков ${Math.round(phonetics.score * 100)}%</p>` : ""}
+      ${phonetics?.feedback ? `<details class="study-feedback-detail"><summary>Произношение</summary><p>${escapeHtml(phonetics.feedback)}</p></details>` : ""}
       <p class="study-note">${practiceNote}</p>`;
   }
 
@@ -263,24 +350,34 @@
     $("study-title").textContent = reviewing ? "Повторение" : modeNames.get(displayMode);
     $("study-title").hidden = !reviewing;
     $("study-intro").textContent = reviewing ? "Вспомните ответы на карточки, у которых подошло время повторения." : exercise[displayMode].intro;
-    $("study-topic-filter").hidden = reviewing || mode !== "topics";
+    $("study-topic-filter").hidden = reviewing || selection === "today" || mode !== "topics";
     $("study-topic").value = topicId;
     $("study-form-status").textContent = "";
     $("study-card").hidden = !round;
     $("study-empty").hidden = !!round;
     if (!round) {
+      const guided = selection === "today";
+      if (guided) {
+        const finished = !guidedTask();
+        $("study-empty-title").textContent = finished ? "Тренировка завершена" : "На сейчас всё";
+        $("study-empty-message").textContent = finished ? "Проверьте себя на новом билете с таймером." : "Оставшиеся упражнения доступны из плана.";
+        $("study-empty-action").textContent = "К плану";
+        $("study-empty-exam").hidden = !finished;
+        return;
+      }
       const repeatAvailable = reviewing && bank.stats(progress).due > 0;
       $("study-empty-title").textContent = repeatAvailable ? "Круг повторения завершён" : "На сейчас всё";
       $("study-empty-message").textContent = repeatAvailable ? "Можно ещё раз пройти оставшиеся карточки или вернуться к новым заданиям." :
         "Карточки появятся здесь, когда их пора будет повторить.";
       $("study-empty-action").textContent = repeatAvailable ? "Повторить ещё раз" : "Продолжить подготовку";
+      $("study-empty-exam").hidden = false;
       return;
     }
     const { item, finished, revealed } = round;
     $("study-instruction").textContent = exercise[item.mode].instruction;
     $("study-prompt").textContent = item.prompt;
     $("study-prompt").lang = item.promptLanguage;
-    $("study-topic-label").textContent = item.topicTitle ?? "";
+    $("study-topic-label").textContent = item.mode === "topics" || item.mode === "passages" ? item.topicTitle ?? "" : "";
     passage();
 
     const input = $("study-answer");
@@ -289,15 +386,18 @@
     input.lang = item.answerLanguage;
     input.placeholder = exercise[item.mode].placeholder;
     input.readOnly = finished;
-    if (finished) renderFeedback(revealed ? null : (round.result ??= bank.grade(item, round.answer)));
+    const result = finished && !revealed ? (round.result ??= bank.grade(item, round.answer)) : null;
+    if (finished) renderFeedback(result);
     else $("study-feedback").hidden = true;
     $("study-retry").hidden = !finished;
     $("study-check").hidden = finished;
     $("study-reveal").hidden = finished;
-    $("study-next").textContent = finished ? "Следующее упражнение" : "Пропустить";
+    const repair = finished && (revealed || result?.outcome !== "correct");
+    $("study-next").textContent = finished ? "Дальше" : "Пропустить";
     $("study-card").dataset.finished = String(finished);
-    $("study-next").classList.toggle("primary", finished);
-    $("study-next").classList.toggle("secondary", !finished);
+    $("study-retry").className = repair ? "button primary" : "text-button";
+    $("study-next").classList.toggle("primary", finished && !repair);
+    $("study-next").classList.toggle("secondary", !finished || repair);
     renderHints();
     renderAudio(audio?.state);
   }
@@ -316,6 +416,10 @@
     round.finished = true;
     round.revealed = revealed;
     round.result = result;
+    const previousVisit = recent.indexOf(round.item.id);
+    if (previousVisit !== -1) recent.splice(previousVisit, 1);
+    recent.push(round.item.id);
+    if (recent.length > 3) recent.shift();
     const before = read(progressKey, progress);
     const now = Date.now();
     const previous = before.items?.[round.item.id];
@@ -402,28 +506,25 @@
 
   $("study-modes").addEventListener("click", (event) => {
     const button = event.target.closest("[data-mode]");
-    if (!button || (!reviewing && mode === button.dataset.mode)) return;
-    mode = button.dataset.mode;
-    reviewing = false;
-    moveToNext();
+    if (button && selection !== button.dataset.mode) openTraining(button.dataset.mode);
   });
   $("study-topic").addEventListener("change", (event) => {
     topicId = event.target.value;
     moveToNext();
   });
   $("study-review").addEventListener("click", () => {
-    reviewing = !reviewing;
-    if (reviewing) visit.clear();
-    moveToNext();
+    openTraining(selection === "review" ? "today" : "review");
   });
   $("study-goal").addEventListener("change", (event) => {
     if (!planner) return;
     goal = planner.normalizeTarget(event.target.value);
     write(goalKey, goal);
     renderPlan();
+    if (plan) $("study-home-status").textContent = `Цель ${points(goal)} · план на ${exerciseCount(plan.workload.count)}`;
   });
   $("study-start-plan").addEventListener("click", () => {
-    if (plan) startTask(plan.tasks.find(({ count, done }) => done < count));
+    if (guidedTask()) openTraining("today");
+    else location.hash = "trainer";
   });
   $("study-tasks").addEventListener("click", (event) => {
     const button = event.target.closest("[data-plan-task]");
@@ -431,11 +532,21 @@
     if (task) startTask(task);
   });
   $("study-empty-action").addEventListener("click", () => {
-    if (!bank.stats(progress).due) reviewing = false;
+    if (selection === "today") {
+      location.hash = "practice";
+      return;
+    }
+    if (!bank.stats(progress).due) {
+      openTraining("today");
+      return;
+    }
     visit.clear();
     moveToNext();
   });
-  $("study-next").addEventListener("click", () => moveToNext());
+  $("study-next").addEventListener("click", () => {
+    if (selection === "today") advanceGuided();
+    else moveToNext();
+  });
   $("study-retry").addEventListener("click", () => {
     begin(round.item, { assisted: true, split: round.split });
     $("study-answer").focus();
@@ -500,22 +611,28 @@
     if ([progressKey, ledgerKey, goalKey, historyKey].includes(event.key)) renderProgress();
   });
   setInterval(() => {
-    if (visible && plan?.day !== planner?.day()) renderProgress();
+    if ((activePage === "practice" || activePage === "train") && plan?.day !== planner?.day()) renderProgress();
   }, 5_000);
 
   const previous = cards.get(saved.itemId);
-  if (previous && (reviewing || (previous.mode === mode && (!topicId || mode !== "topics" || previous.topicId === topicId)))) {
+  if (previous && (selection === "today" || reviewing || (previous.mode === mode && (!topicId || mode !== "topics" || previous.topicId === topicId)))) {
     begin(previous, saved);
-  } else moveToNext(false);
+  } else if (selection === "today") {
+    advanceGuided(false);
+  } else {
+    moveToNext(false);
+  }
 
   window.EXAM_STUDY_UI = {
-    show(nextVisible) {
-      if (visible && !nextVisible) {
+    show(page, requested) {
+      if (activePage === "train" && page !== "train") {
         audioRequest = null;
         audio?.reset();
       }
-      if (nextVisible) renderProgress();
-      visible = nextVisible;
+      if (page === "train") selectTraining(requested);
+      if (page === "practice") renderProgress();
+      else $("study-home-status").textContent = "";
+      activePage = page;
     },
   };
   window.addEventListener("pagehide", () => {

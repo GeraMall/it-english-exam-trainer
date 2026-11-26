@@ -9,7 +9,18 @@
     { id: "topics", title: "Ответы по темам", max: 12, modes: ["topics"] },
     { id: "passages", title: "Перевод с листа", max: 8, modes: ["passages"] },
   ];
-  const modeIds = new Set(sections.flatMap(({ modes }) => modes));
+  const formats = {
+    vocab: { label: "Перевод терминов", minutes: 0.5 },
+    definitions: { label: "Определения", minutes: 1 },
+    abbreviations: { label: "Аббревиатуры", minutes: 0.5 },
+    topics: { label: "Ответы по темам", minutes: 2.5 },
+    passages: { label: "Перевод с листа", minutes: 3.5 },
+  };
+  const modeIds = new Set(Object.keys(formats));
+  const additionalCards = [
+    "vocab", "definitions", "abbreviations", "topics", "vocab", "passages", "definitions", "abbreviations", "vocab", "vocab",
+    "vocab", "abbreviations", "definitions", "topics", "vocab", "passages", "definitions", "abbreviations", "vocab", "vocab",
+  ];
   const moscowDate = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Moscow", year: "numeric", month: "2-digit", day: "2-digit",
   });
@@ -90,21 +101,34 @@
       .sort((first, second) => first.ratio - second.ratio)[0].id;
   }
 
-  function taskPlan(baseline, focus, target, gap, progress, today, day, now) {
-    const level = target >= 28 || (gap ?? 0) >= 12 ? 2 : target >= 22 || (gap ?? 0) >= 7 ? 1 : 0;
-    const quota = { terms: 3 + level * 2, topics: level >= 1 ? 2 : 1, passages: 1 };
-    if (baseline && gap > 0) quota[focus] += focus === "terms" ? 2 : 1;
-    const counts = Object.fromEntries([...modeIds].map((id) => [id, 0]));
+  function practicePlan(target, focus, needsPractice, today) {
+    const quota = Object.fromEntries([...modeIds].map((mode) => [mode, 1]));
+    const extras = additionalCards.slice(0, target - 10);
+    // Add one exercise per target point. An extra short card can make room for practice in the measured weak section.
+    if (needsPractice && extras.length > 8) {
+      extras[8] = focus === "terms" ? "definitions" : focus;
+      if (focus === "passages" && extras.length > 15) extras[15] = "vocab";
+    }
+    for (const mode of extras) quota[mode]++;
+
+    const counts = Object.fromEntries([...modeIds].map((mode) => [mode, 0]));
     for (const { mode } of today.values()) counts[mode]++;
-    const terms = sections[0].modes;
-    const nextTermMode = terms.reduce((best, mode) => counts[mode] < counts[best] ? mode : best, terms[0]);
-    const material = sections.map((section) => ({
-      id: section.id,
-      label: section.title,
-      count: quota[section.id],
-      done: Math.min(quota[section.id], section.modes.reduce((sum, mode) => sum + counts[mode], 0)),
-      mode: section.id === "terms" ? nextTermMode : section.id,
+    return Object.keys(formats).map((mode) => ({
+      mode, label: formats[mode].label, count: quota[mode], done: Math.min(quota[mode], counts[mode]),
     }));
+  }
+
+  function taskPlan(baseline, focus, practice, progress, today, day, now) {
+    const material = sections.map((section) => {
+      const parts = practice.filter(({ mode }) => section.modes.includes(mode));
+      const next = parts.reduce((best, part) => part.done / part.count < best.done / best.count ? part : best);
+      return {
+        id: section.id, label: section.title, mode: next.mode,
+        count: parts.reduce((sum, part) => sum + part.count, 0),
+        done: parts.reduce((sum, part) => sum + part.done, 0),
+        ...(section.id === "terms" ? { parts } : {}),
+      };
+    });
     material.sort((first, second) => Number(second.id === focus) - Number(first.id === focus));
 
     const reviewed = [...today.values()].filter((card) => card.reviewed).length;
@@ -128,10 +152,20 @@
     const baseline = latest && { total: latest.total, parts: latest.parts, at: latest.at, mode: latest.mode };
     const gap = baseline ? Math.max(0, Math.round((goal - baseline.total) * 100) / 100) : null;
     const focus = weakestSection(baseline);
+    const focusIndex = sections.findIndex(({ id }) => id === focus);
+    const { title: label, max } = sections[focusIndex];
+    const focusDetail = { id: focus, label, score: baseline?.parts[focusIndex] ?? null, max };
     const today = completedToday(progress, ledger, day, clock);
-    const tasks = taskPlan(baseline, focus, goal, gap, progress, today, day, clock);
+    const practice = practicePlan(goal, focus, focusDetail.score !== null && focusDetail.score < max, today);
+    const tasks = taskPlan(baseline, focus, practice, progress, today, day, clock);
+    const nextTask = tasks.find(({ count, done }) => done < count) ?? null;
+    const count = practice.reduce((sum, part) => sum + part.count, 0);
+    const done = practice.reduce((sum, part) => sum + part.done, 0);
+    const reviewCount = tasks.find((task) => task.id === "review")?.count ?? 0;
+    const dailyMinutes = practice.reduce((sum, part) => sum + part.count * formats[part.mode].minutes, reviewCount);
     return {
-      day, target: goal, baseline, gap, focus, daysLeft: daysTo(examDate, day), tasks,
+      day, target: goal, baseline, gap, focus, focusDetail, daysLeft: daysTo(examDate, day), tasks, nextTask,
+      workload: { count, done }, dailyMinutes,
       completed: tasks.filter(({ count, done }) => done >= count).length, todayCards: today.size,
     };
   }

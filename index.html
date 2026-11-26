@@ -2,14 +2,14 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="description" content="Подготовка по заданиям экзамена по техническому английскому, повторение ошибок и пробный экзамен с оценкой из 30.">
   <meta name="theme-color" content="#234787">
   <title>Английский для ИТ · Экзаменационный тренажёр</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="styles.css?v=5">
+  <link rel="stylesheet" href="styles.css?v=6">
   <script defer src="data/vocabulary.js"></script>
-  <script defer src="data/course.js"></script>
+  <script defer src="data/course.js?v=2"></script>
   <script defer src="grading.js"></script>
   <script defer src="transcription.js"></script>
   <script defer src="pronunciation.js"></script>
@@ -17,41 +17,39 @@
   <script defer src="voice.js"></script>
   <script defer src="study-data.js"></script>
   <script defer src="study-audio.js"></script>
-  <script defer src="study-plan.js"></script>
-  <script defer src="study.js?v=3"></script>
-  <script defer src="app.js?v=4"></script>
+  <script defer src="study-plan.js?v=2"></script>
+  <script defer src="study.js?v=4"></script>
+  <script defer src="app.js?v=5"></script>
 </head>
 <body>
   <header class="site-bar">
     <div class="shell bar-inner">
       <a class="brand" href="#practice">
-        <span class="brand-icon" aria-hidden="true"><i></i></span>
+        <img class="brand-logo" src="assets/mirea-logo.png" alt="РТУ МИРЭА" width="40" height="36">
         <span>Английский для ИТ</span>
       </a>
     </div>
   </header>
   <main class="shell">
+    <nav class="tabs" aria-label="Разделы">
+      <a href="#practice" data-page="practice"><span class="nav-symbol" aria-hidden="true"><i class="nav-icon nav-study"></i></span><span>Подготовка</span></a>
+      <a href="#trainer" data-page="trainer" aria-label="Полный экзамен"><span class="nav-symbol" aria-hidden="true"><i class="nav-icon nav-exam"></i></span><span class="nav-desktop">Полный экзамен</span><span class="nav-mobile" aria-hidden="true">Экзамен</span></a>
+      <a href="#materials" data-page="materials"><span class="nav-symbol" aria-hidden="true"><i class="nav-icon nav-materials"></i></span><span>Материалы</span></a>
+      <a href="#history" data-page="history"><span class="nav-symbol" aria-hidden="true"><i class="nav-icon nav-history"></i></span><span>История</span></a>
+    </nav>
     <div class="intro">
-      <div>
-        <h1>Экзаменационный тренажёр</h1>
-      </div>
+      <h1 id="page-title" tabindex="-1">Подготовка к экзамену</h1>
       <button type="button" class="exam-date" id="edit-date" aria-label="Изменить дату экзамена">
         <span class="calendar-icon" aria-hidden="true"></span>
         <span class="date-copy"><span id="days-left">До экзамена</span><span id="exam-date-label">10 декабря 2026</span></span>
         <span class="date-edit" aria-hidden="true">✎</span>
       </button>
     </div>
-    <nav class="tabs" aria-label="Разделы">
-      <a href="#practice" data-page="practice">Подготовка</a>
-      <a href="#trainer" data-page="trainer">Пробный экзамен</a>
-      <a href="#materials" data-page="materials">Материалы</a>
-      <a href="#history" data-page="history">История</a>
-    </nav>
 
-    <section id="page-practice" class="page study-page">
+    <section id="page-practice" class="page study-page route-page">
       <div class="study-dashboard" id="study-dashboard">
         <section class="daily-card" aria-labelledby="study-today-title">
-          <header class="report-header"><h2 id="study-today-title">Сегодня</h2><span id="study-today" class="report-meta" aria-live="polite"></span></header>
+          <header class="report-header"><h2 id="study-today-title">План на сегодня</h2><span id="study-today" class="report-meta" aria-live="polite"></span></header>
           <ul class="plan-tasks" id="study-tasks" aria-label="План на сегодня"></ul>
           <div class="today-actions">
             <button type="button" class="button primary" id="study-start-plan">Начать тренировку</button>
@@ -61,8 +59,9 @@
         <section class="goal-card" aria-labelledby="study-goal-title">
           <header class="report-header">
             <h2 id="study-goal-title">Цель к экзамену</h2>
-            <label class="goal-edit" for="study-goal"><span>Цель</span><select id="study-goal" aria-label="Цель в баллах"></select></label>
+            <label class="goal-edit" for="study-goal"><select id="study-goal" aria-label="Цель в баллах" aria-describedby="study-goal-impact"></select></label>
           </header>
+          <p class="goal-impact" id="study-goal-impact" aria-live="polite"></p>
           <div class="goal-values">
             <div><p class="report-meta">Последний пробный</p><output class="goal-value" id="study-goal-result">—</output></div>
             <p id="study-goal-status" class="report-meta">Пока нет оценки</p>
@@ -71,16 +70,24 @@
             <div class="goal-track"><span class="goal-actual" id="study-goal-actual"></span><span class="goal-marker"></span></div>
             <div class="goal-ticks" aria-hidden="true"><span>0</span><span>10</span><span>20</span><span>30</span></div>
           </div>
-          <details class="goal-details" id="study-goal-breakdown" hidden>
-            <summary>Баллы по частям</summary>
-            <dl id="study-goal-parts"></dl>
+          <details class="goal-details" id="study-goal-breakdown">
+            <summary>Проверка готовности</summary>
+            <dl id="study-goal-parts" hidden></dl>
+            <p id="study-readiness"></p>
           </details>
         </section>
       </div>
+      <p id="study-home-status" class="report-meta" role="status"></p>
+    </section>
 
-      <section class="study-workspace" id="study-workspace" aria-labelledby="study-practice-title">
+    <section id="page-train" class="page training-page route-page" aria-label="Тренировка" hidden>
+      <div class="study-workspace" id="study-workspace">
         <div class="practice-toolbar">
-          <h2 id="study-practice-title">Упражнения</h2>
+          <a class="text-button study-back" href="#practice">К плану</a>
+          <div class="training-meter" id="study-training-meter" hidden>
+            <progress id="study-session-progress" max="1" value="0" aria-label="Ход тренировки на сегодня"></progress>
+            <span id="study-session-count"></span>
+          </div>
           <button type="button" class="button secondary study-repeat" id="study-review"><span>Повторить</span><span id="study-due">0</span></button>
         </div>
         <nav id="study-modes" aria-label="Виды заданий"></nav>
@@ -102,7 +109,7 @@
             </div>
           </div>
           <form id="study-form">
-            <label for="study-answer" id="study-answer-label">Ответ</label>
+            <label for="study-answer" id="study-answer-label">Введите ответ</label>
             <textarea id="study-answer" aria-describedby="study-form-status" rows="2" maxlength="4000"></textarea>
             <div class="study-audio" id="study-audio" hidden>
               <div class="study-buttons">
@@ -128,15 +135,15 @@
           </div>
         </article>
         <div class="study-card study-empty" id="study-empty" hidden>
-          <h3 id="study-empty-title"></h3>
+          <h3 id="study-empty-title" tabindex="-1"></h3>
           <p id="study-empty-message"></p>
           <div class="study-buttons">
             <button type="button" class="button primary" id="study-empty-action"></button>
-            <a class="button secondary" href="#trainer">Пробный экзамен</a>
+            <a class="button secondary" id="study-empty-exam" href="#trainer">Полный экзамен</a>
           </div>
         </div>
         <p class="study-note" id="study-storage-status" role="status"></p>
-      </section>
+      </div>
     </section>
 
     <section id="page-trainer" class="page" hidden>
@@ -282,7 +289,7 @@
       <div class="panel-head"><h2>История попыток</h2><p>Результаты самопроверки в этом браузере.</p></div>
       <div id="history-content"></div>
     </section>
-    <footer class="footer"><span>Английский для ИТ</span><span>Тренажёр для самостоятельной подготовки</span></footer>
+    <footer class="footer"><span>Самостоятельный тренажёр по английскому</span></footer>
   </main>
 
   <dialog id="date-dialog">

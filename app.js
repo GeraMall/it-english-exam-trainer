@@ -70,6 +70,7 @@
   let reviewParts = null;
   let reviewMode = "written";
   let reviewPending = false;
+  let reviewComplete = false;
   let answerMode = "written";
   let voice;
   let currentMaterial = "topics";
@@ -256,6 +257,7 @@
   function startTimer() {
     deadline = Date.now() + seconds * 1000;
     ticket.deadline = deadline;
+    ticket.usedTimer = true;
     saveDraft();
     timerState = "running";
     updateTimer();
@@ -390,6 +392,7 @@
       </div>`;
     $("review").hidden = false;
     reviewMode = voiceResult ? "voice" : "written";
+    reviewComplete = voiceTasks().every(({ key }) => answer(key).length > 0);
     $("review-method").textContent = voiceResult ? "Содержание оценивается по расшифровке. В четырёх вопросах беседы тренажёр приблизительно сравнивает звуки записи с произношением распознанных слов." :
       "Тренажёр сверяет термины со словарём и ищет ключевые мысли в развёрнутых ответах. Оценка ориентировочная и учитывает текст ответа.";
     $("review-record").hidden = !!voiceResult || !recordingUrl;
@@ -654,21 +657,28 @@
   }
 
   function showPage() {
-    const hash = location.hash.slice(1);
-    const page = ["practice", "trainer", "materials", "history"].includes(hash) ? hash : "practice";
-    if (page !== "trainer") {
+    const [requested, query = ""] = location.hash.slice(1).split("?", 2);
+    const titles = { practice: "Подготовка к экзамену", train: "Тренировка", trainer: "Полный экзамен", materials: "Материалы", history: "История" };
+    const page = Object.hasOwn(titles, requested) ? requested : "practice";
+    if (page !== "trainer" && currentPage !== page) {
       cancelDictation();
       voice?.suspend();
     }
+    const tab = page === "train" ? "practice" : page;
     document.querySelectorAll("[data-page]").forEach((link) => {
-      if (link.dataset.page === page) link.setAttribute("aria-current", "page");
+      if (link.dataset.page === tab) link.setAttribute("aria-current", "page");
       else link.removeAttribute("aria-current");
-      $("page-" + link.dataset.page).hidden = link.dataset.page !== page;
     });
+    for (const name of Object.keys(titles)) $("page-" + name).hidden = name !== page;
+    $("page-title").textContent = titles[page];
+    $("edit-date").hidden = page !== "practice" && page !== "trainer";
     if (page === "materials") renderMaterials();
     if (page === "history") renderHistory();
-    window.EXAM_STUDY_UI?.show(page === "practice");
-    if (currentPage && page !== currentPage) window.scrollTo(0, 0);
+    window.EXAM_STUDY_UI?.show(page, new URLSearchParams(query).get("mode"));
+    if (currentPage && page !== currentPage) {
+      window.scrollTo(0, 0);
+      $("page-title").focus({ preventScroll: true });
+    }
     currentPage = page;
   }
 
@@ -812,6 +822,8 @@
       savedRevision: ticket.revision ?? 0,
       mode: reviewMode,
       preliminary: reviewPending,
+      full: reviewComplete,
+      timed: ticket.usedTimer === true || Number.isFinite(ticket.deadline),
     });
     const persisted = write("history", history);
     $("save-status").textContent = persisted ? "Результат сохранён в истории попыток." : "Результат доступен в истории до закрытия страницы.";

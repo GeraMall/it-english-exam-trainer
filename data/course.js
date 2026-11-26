@@ -85,6 +85,9 @@
         question("Why might a designer choose NOR flash for firmware and NAND flash for a storage drive?",
           "NOR flash supports efficient random reads, so a processor can sometimes execute firmware directly from it. NAND flash is denser and typically accessed in pages, which makes it suitable for large amounts of data. NAND is commonly used in memory cards and SSDs, where a controller manages reads and writes.",
           ["NOR and direct random access", "NAND density and page access", "Typical uses for each"]),
+        question("When reading from a hard disk, how do seek time and transfer rate affect different workloads?",
+          "Seek time is how long the drive takes to move its read head to the required track. Transfer rate is the amount of data the drive can read or write per second once the transfer begins. Reading many small files scattered across a disk can involve frequent seeks, whereas reading a large sequential file depends more on the sustained transfer rate.",
+          ["Seek time and movement of the read head", "Transfer rate in bytes per second", "Scattered small files versus a large sequential read"]),
       ],
     },
     {
@@ -170,6 +173,9 @@
         question("How does packet switching share a network differently from circuit switching?",
           "Circuit switching reserves a communication path for the duration of a session. Packet switching divides data into packets that share links with other traffic and are forwarded as capacity is available. This sharing makes good use of links, but congestion can cause queues and variable delay. Traditional telephone calls illustrate circuit switching, while the Internet uses packet switching.",
           ["Reserved circuit for the session", "Packets share links", "Queueing trade-off or a correct example"]),
+        question("How did dial-up and DSL differ when both used a copper telephone line?",
+          "A dial-up modem placed a call to the Internet provider using the same frequency range as a voice call. That kept the line busy until the modem disconnected. DSL used a higher range of frequencies on the same copper pair. It could provide an always-on, faster connection while leaving the voice band available for calls.",
+          ["Dial-up placed a call in the voice band", "Dial-up kept the phone line busy", "DSL used higher frequencies and allowed simultaneous voice service"]),
       ],
     },
     {
@@ -272,6 +278,9 @@
         question("What role does backpropagation play in training, and why can a neural network be hard to interpret?",
           "Backpropagation calculates how changes to the network’s weights would affect its prediction error. An optimizer uses that information to update the weights. In a large network, a prediction can depend on many interacting weights across layers, so it may be difficult to explain which inputs or internal decisions led to the final result.",
           ["The prediction error and gradients", "An optimizer updates weights", "Interacting components affect interpretability"]),
+        question("Why give each device in an Internet of Things system a unique identifier?",
+          "A unique identifier lets an IoT service distinguish between devices of the same model and associate each reading with the device that produced it. It can also link a device to its inventory record when staff check its location or service history. The identifier should stay consistent when the device reconnects, and the service can verify the device using its own credentials.",
+          ["Distinguish individual devices of the same model", "Link readings or maintenance records to the right device", "Keep identifiers stable and use credentials to verify identity"]),
       ],
     },
     {
