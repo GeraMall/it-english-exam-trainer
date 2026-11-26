@@ -126,6 +126,7 @@
     if (!planner) {
       $("study-start-plan").disabled = true;
       $("study-goal").disabled = true;
+      $("study-goal-slider").disabled = true;
       return;
     }
     const history = read(historyKey, []);
@@ -149,11 +150,13 @@
         baseline && gap > 0 ? `Фокус · ${sectionNames[plan.focus]}` : "";
 
     $("study-goal").value = String(target);
+    const slider = $("study-goal-slider");
+    if (slider.value !== String(target)) slider.value = String(target);
+    slider.setAttribute("aria-valuetext", points(target));
     $("study-goal-result").textContent = baseline ? `${formatNumber.format(baseline.total)} / 30` : "—";
     $("study-goal-status").textContent = baseline ? gap > 0 ? `До цели ${points(gap)}` : "Цель достигнута" : "Пока нет оценки";
     $("study-goal-status").classList.toggle("goal-reached", baseline && gap === 0);
     const scale = $("study-goal-scale");
-    scale.style.setProperty("--target", `${target / 30 * 100}%`);
     scale.style.setProperty("--actual", `${(baseline?.total ?? 0) / 30 * 100}%`);
     scale.setAttribute("aria-label", `Шкала от 0 до 30, цель ${points(target)}${baseline ? `, последний пробный ${points(baseline.total)}` : ""}`);
     $("study-goal-actual").hidden = !baseline;
@@ -515,13 +518,17 @@
   $("study-review").addEventListener("click", () => {
     openTraining(selection === "review" ? "today" : "review");
   });
-  $("study-goal").addEventListener("change", (event) => {
+  function changeGoal(value) {
     if (!planner) return;
-    goal = planner.normalizeTarget(event.target.value);
+    const next = planner.normalizeTarget(value);
+    if (next === goal) return;
+    goal = next;
     write(goalKey, goal);
     renderPlan();
     if (plan) $("study-home-status").textContent = `Цель ${points(goal)} · план на ${exerciseCount(plan.workload.count)}`;
-  });
+  }
+  $("study-goal").addEventListener("change", (event) => changeGoal(event.target.value));
+  $("study-goal-slider").addEventListener("input", (event) => changeGoal(event.target.value));
   $("study-start-plan").addEventListener("click", () => {
     if (guidedTask()) openTraining("today");
     else location.hash = "trainer";

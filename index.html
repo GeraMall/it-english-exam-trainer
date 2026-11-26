@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#234787">
   <title>Английский для ИТ · Экзаменационный тренажёр</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="styles.css?v=6">
+  <link rel="stylesheet" href="styles.css?v=7">
   <script defer src="data/vocabulary.js"></script>
   <script defer src="data/course.js?v=2"></script>
   <script defer src="grading.js"></script>
@@ -18,8 +18,8 @@
   <script defer src="study-data.js"></script>
   <script defer src="study-audio.js"></script>
   <script defer src="study-plan.js?v=2"></script>
-  <script defer src="study.js?v=4"></script>
-  <script defer src="app.js?v=5"></script>
+  <script defer src="study.js?v=5"></script>
+  <script defer src="app.js?v=6"></script>
 </head>
 <body>
   <header class="site-bar">
@@ -66,8 +66,11 @@
             <div><p class="report-meta">Последний пробный</p><output class="goal-value" id="study-goal-result">—</output></div>
             <p id="study-goal-status" class="report-meta">Пока нет оценки</p>
           </div>
-          <div class="goal-scale" id="study-goal-scale" role="img" aria-label="Шкала баллов от 0 до 30">
-            <div class="goal-track"><span class="goal-actual" id="study-goal-actual"></span><span class="goal-marker"></span></div>
+          <div class="goal-scale" id="study-goal-scale" role="group" aria-label="Шкала баллов от 0 до 30">
+            <div class="goal-track">
+              <span class="goal-actual" id="study-goal-actual"></span>
+              <input id="study-goal-slider" type="range" min="10" max="30" step="1" value="20" aria-label="Цель на шкале в баллах" aria-describedby="study-goal-impact">
+            </div>
             <div class="goal-ticks" aria-hidden="true"><span>0</span><span>10</span><span>20</span><span>30</span></div>
           </div>
           <details class="goal-details" id="study-goal-breakdown">

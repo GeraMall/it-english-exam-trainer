@@ -147,17 +147,17 @@
       <header class="paper-top"><strong>Иностранный язык</strong><span>3–4-й семестры</span></header>
       <div class="paper-heading"><h3>Экзаменационный билет № ${ticketLabel()}</h3><p lang="en">Essential English for IT Students</p></div>
       <section class="paper-section">
-        <h4>1. Терминология</h4>
+        <h4>1. Терминология (до ${maximum[0]}&nbsp;баллов)</h4>
         <p><strong>а)</strong> Переведите на английский язык: ${translations.map(({ru}) => escapeHtml(ru)).join("; ")}.</p>
         <p><strong>б)</strong> Дайте определения на английском языке: <span lang="en">${definitions.map(({term}) => escapeHtml(term)).join("; ")}</span>.</p>
         <p><strong>в)</strong> Расшифруйте аббревиатуры: <span lang="en">${abbreviations.map(({short}) => escapeHtml(short)).join("; ")}</span>.</p>
       </section>
       <section class="paper-section">
-        <h4>2. Ответьте на вопросы по четырём темам</h4>
+        <h4>2. Ответьте на вопросы по четырём темам (до ${maximum[1]}&nbsp;баллов)</h4>
         <ol lang="en">${topics.map(({topic, question}) => `<li><strong>${escapeHtml(topic.title)}.</strong> ${escapeHtml(question.prompt)}</li>`).join("")}</ol>
       </section>
       <section class="paper-section">
-        <h4>3. Переведите фрагмент с английского на русский язык устно с листа</h4>
+        <h4>3. Переведите фрагмент с английского на русский язык устно с листа (до ${maximum[2]}&nbsp;баллов)</h4>
         <p class="paper-passage-title" lang="en">${escapeHtml(passage.title)}</p>
         <p class="paper-passage" lang="en">${escapeHtml(passage.text)}</p>
       </section>
